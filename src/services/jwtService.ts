@@ -1,14 +1,24 @@
 import 'dotenv/config';
-import { get } from 'http';
 import * as jose from 'jose';
+import { randomUUID } from 'node:crypto';
+import { invalidTokenRepository } from '../infrastructure/invalidTokenRepository.js';
+
+export interface JwtPayload {
+  userId: string;
+  tokenId: string;
+}
 
 export async function generateJwt(userId: string): Promise<string> {
   const JWT_SECRET = getJwtSecret();
+  const tokenId = randomUUID();
 
-  return await new jose.SignJWT({ userId })
+  const token = await new jose.SignJWT({ userId })
     .setProtectedHeader({ alg: 'HS256' })
-    .setExpirationTime('60m') // 60 minutes TTL as per requirement
+    .setJti(tokenId)
+    .setExpirationTime('60m')
     .sign(new TextEncoder().encode(JWT_SECRET));
+
+  return token;
 }
 
 export function getTokenExpirationTime(token: string): number {
@@ -16,12 +26,29 @@ export function getTokenExpirationTime(token: string): number {
   return decoded.exp!;
 }
 
-export async function verifyJwt(token: string): Promise<{ userId: string }> {
+export function getTokenId(token: string): string {
+  const decoded = jose.decodeJwt(token);
+  return decoded.jti!;
+}
+
+export async function verifyJwt(token: string): Promise<JwtPayload> {
   const JWT_SECRET = getJwtSecret();
 
   const { payload } = await jose.jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
+  
+  const tokenId = payload.jti as string;
+  
+  // Check if token is in the invalid tokens list
+  const isInvalid = await invalidTokenRepository.isTokenInvalid(tokenId);
 
-  return { userId: payload.userId as string };
+  if (isInvalid) {
+    throw new Error('Authorization token is invalid');
+  }
+
+  return { 
+    userId: payload.userId as string,
+    tokenId: tokenId
+  };
 }
 
 function getJwtSecret(): string {

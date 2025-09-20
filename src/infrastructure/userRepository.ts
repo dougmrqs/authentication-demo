@@ -23,6 +23,16 @@ class UserRepository {
     return;
   }
 
+  async findByEmail(email: string): Promise<User | null> {
+    const user = await db('users').where({ email }).first();
+
+    if (!user) {
+      return null;
+    }
+
+    return this.tableRowToUser(user);
+  }
+
   async findById(id: string): Promise<User | null> {
     const user = await db('users').where({ id }).first();
 

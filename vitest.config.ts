@@ -7,6 +7,7 @@ export default defineConfig({
     setupFiles: ['./test/setup.ts'],
     env: {
       NODE_ENV: 'test',
+      JWT_SECRET: 'test-jwt-secret-key-for-vitest-testing-only',
     },
   },
 });

@@ -1,0 +1,20 @@
+{
+  "name": "authentication-example",
+  "version": "0.0.0",
+  "description": "User storage and authentication example with express and JWT",
+  "main": "index.js",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^24.5.1",
+    "typescript": "^5.9.2"
+  }
+}

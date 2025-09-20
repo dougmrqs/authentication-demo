@@ -26,26 +26,26 @@ describe('JWT Service', () => {
     );
   });
 
-  it('fails to verify a token older than 5 minutes', async () => {
+  it('fails to verify a token older than 60 minutes', async () => {
     vi.useFakeTimers();
     const userId = 'old-token-user';
 
     const token = await generateJwt(userId);
 
-    // Advance time by 10 minutes (600,000 milliseconds)
-    vi.advanceTimersByTime(10 * 60 * 1000);
+    // Advance time by 70 minutes (4,200,000 milliseconds)
+    vi.advanceTimersByTime(70 * 60 * 1000);
 
     await expect(verifyJwt(token)).rejects.toThrow();
   });
 
-  it('successfully verifies a token within 5 minutes', async () => {
+  it('successfully verifies a token within 60 minutes', async () => {
     vi.useFakeTimers();
     const userId = 'valid-token-user';
 
     const token = await generateJwt(userId);
 
-    // Advance time by 4 minutes (still within the 5-minute window)
-    vi.advanceTimersByTime(4 * 60 * 1000);
+    // Advance time by 30 minutes (still within the 60-minute window)
+    vi.advanceTimersByTime(30 * 60 * 1000);
 
     const result = await verifyJwt(token);
     expect(result.userId).toBe(userId);

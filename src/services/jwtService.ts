@@ -7,8 +7,13 @@ export async function generateJwt(userId: string): Promise<string> {
 
   return await new jose.SignJWT({ userId })
     .setProtectedHeader({ alg: 'HS256' })
-    .setExpirationTime('5m')
+    .setExpirationTime('60m') // 60 minutes TTL as per requirement
     .sign(new TextEncoder().encode(JWT_SECRET));
+}
+
+export function getTokenExpirationTime(token: string): number {
+  const decoded = jose.decodeJwt(token);
+  return decoded.exp!;
 }
 
 export async function verifyJwt(token: string): Promise<{ userId: string }> {

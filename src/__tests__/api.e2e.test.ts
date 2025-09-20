@@ -1,6 +1,49 @@
 import request from 'supertest';
+import path from 'node:path';
+import fs from 'node:fs';
 import app from '../server.js';
 import { cleanDatabase } from '../../test/helpers.js';
+
+// Helper function to create user and get auth token
+async function createUserAndGetToken() {
+  const user = {
+    email: 'test@example.com',
+    password: 'StrongPass123#'
+  };
+
+  // Create user
+  await request(app)
+    .post('/api/users')
+    .send(user)
+    .expect(201);
+
+  // Sign in to get token
+  const signInResponse = await request(app)
+    .post('/api/sign-in')
+    .send(user)
+    .expect(200);
+
+  return signInResponse.body.jwtToken;
+}
+
+// Create a test image file for testing
+const testImagePath = path.join(process.cwd(), 'test-image.png');
+const testImageBuffer = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
+  'base64'
+);
+
+beforeAll(() => {
+  // Create test image file
+  fs.writeFileSync(testImagePath, testImageBuffer);
+});
+
+afterAll(() => {
+  // Clean up test image file
+  if (fs.existsSync(testImagePath)) {
+    fs.unlinkSync(testImagePath);
+  }
+});
 
 describe('E2E API Tests', () => {
   beforeEach(async () => {
@@ -266,6 +309,122 @@ describe('E2E API Tests', () => {
           })
         ])
       );
+    });
+  });
+
+  describe('POST /api/posts', () => {
+    it('should create a post with image upload when authenticated', async () => {
+      const token = await createUserAndGetToken();
+
+      const response = await request(app)
+        .post('/api/posts')
+        .set('Authorization', `Bearer ${token}`)
+        .field('title', 'Test Post Title')
+        .field('description', 'Test post description')
+        .attach('image', testImagePath)
+        .expect(201);
+
+      expect(response.body).toMatchObject({
+        id: expect.any(Number),
+        title: 'Test Post Title',
+        description: 'Test post description',
+        imageUrl: expect.stringMatching(/^\/uploads\/.+\.png$/),
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String)
+      });
+    });
+
+    it('should reject post creation without authentication', async () => {
+      const response = await request(app)
+        .post('/api/posts')
+        .field('title', 'Test Post')
+        .field('description', 'Test description')
+        .attach('image', testImagePath)
+        .expect(401);
+
+      expect(response.body.error).toBe('Authorization header missing');
+    });
+
+    it('should reject post creation without image', async () => {
+      const token = await createUserAndGetToken();
+
+      const response = await request(app)
+        .post('/api/posts')
+        .set('Authorization', `Bearer ${token}`)
+        .field('title', 'Test Post')
+        .field('description', 'Test description')
+        .expect(400);
+
+      expect(response.body.error).toBe('Image file is required');
+    });
+
+    it('should reject post creation with invalid title', async () => {
+      const token = await createUserAndGetToken();
+
+      const response = await request(app)
+        .post('/api/posts')
+        .set('Authorization', `Bearer ${token}`)
+        .field('title', '')
+        .field('description', 'Test description')
+        .attach('image', testImagePath)
+        .expect(400);
+
+      expect(response.body.error).toBe('Validation failed');
+    });
+  });
+
+  describe('GET /api/posts', () => {
+    it('should return empty array when no posts exist', async () => {
+      const response = await request(app)
+        .get('/api/posts')
+        .expect(200);
+
+      expect(response.body).toEqual([]);
+    });
+
+    it('should return posts in descending order by creation date', async () => {
+      const token = await createUserAndGetToken();
+
+      // Create first post
+      await request(app)
+        .post('/api/posts')
+        .set('Authorization', `Bearer ${token}`)
+        .field('title', 'First Post')
+        .field('description', 'First description')
+        .attach('image', testImagePath)
+        .expect(201);
+
+      // Add a small delay to ensure different timestamps
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Create second post
+      await request(app)
+        .post('/api/posts')
+        .set('Authorization', `Bearer ${token}`)
+        .field('title', 'Second Post')
+        .field('description', 'Second description')
+        .attach('image', testImagePath)
+        .expect(201);
+
+      const response = await request(app)
+        .get('/api/posts')
+        .expect(200);
+
+      expect(response.body).toHaveLength(2);
+      expect(response.body[0].title).toBe('Second Post');
+      expect(response.body[1].title).toBe('First Post');
+
+      // Check that all posts have the required structure
+      response.body.forEach((post: any) => {
+        expect(post).toMatchObject({
+          id: expect.any(Number),
+          title: expect.any(String),
+          description: expect.any(String),
+          imageUrl: expect.stringMatching(/^\/uploads\/.+\.png$/),
+          createdAt: expect.any(String),
+          updatedAt: expect.any(String)
+        });
+      });
     });
   });
 

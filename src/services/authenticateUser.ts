@@ -14,7 +14,7 @@ export async function authenticateUser({ email, password }: AuthenticateUserPara
     throw new Error('Authentication failed');
   }
 
-  const isPasswordValid = await verifyPassword(password, maybeUser.passwordHash);
+  const isPasswordValid = await verifyPassword(maybeUser.passwordHash, password);
 
   if (!isPasswordValid) {
     throw new Error('Authentication failed');
